@@ -217,7 +217,13 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 Connect your Solana wallet to redeem tokens
               </p>
               <div className="mt-4">
-                <WalletMultiButton />
+                <WalletMultiButton
+                  style={{
+                    backgroundColor: 'white',
+                    color: 'black',
+                    border: '1px solid black',
+                  }}
+                />
               </div>
             </div>
           </CardContent>
@@ -277,6 +283,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
               onClick={handleRedeem}
               disabled={loading}
               className="w-full h-12 text-lg"
+              variant="outline"
             >
               {loading ? (
                 <div className="flex items-center space-x-2">
