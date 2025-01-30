@@ -50,10 +50,13 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [redemptionsLeft, setRedemptionsLeft] = useState<number>(0);
 
   useEffect(() => {
-    fetchPool();
-  }, []);
+    if (connected) {
+      fetchPool();
+    }
+  }, [connected]);
 
   const fetchPool = async () => {
+    console.log('fetching pool', poolId);
     try {
       const response = await fetch(`/api/redeem/${poolId}`);
       const data = await response.json();
