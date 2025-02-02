@@ -1,12 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  useWallet,
-  useConnection,
-} from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { Transaction } from '@solana/web3.js';
 import toast from 'react-hot-toast';
 import {
   Card,
@@ -40,14 +36,20 @@ interface RedemptionPool {
   expires_at: string | null;
 }
 
+interface RedeemedPool {
+  amount: string;
+  userWallet: string;
+}
+
 export default function RedeemPage({ params }: RedeemPageProps) {
   const { poolId } = params;
   const { publicKey, connected } = useWallet();
-  const { connection } = useConnection();
   const [loading, setLoading] = useState(false);
   const [redeemed, setRedeemed] = useState(false);
   const [pool, setPool] = useState<RedemptionPool | null>(null);
-  const [redemptionsLeft, setRedemptionsLeft] = useState<number>(0);
+  const [redeemedPool, setRedeemedPool] = useState<RedeemedPool[]>(
+    []
+  );
 
   useEffect(() => {
     if (connected) {
@@ -56,7 +58,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   }, [connected]);
 
   const fetchPool = async () => {
-    console.log('fetching pool', poolId);
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/getRedeemTokenFromPool/${poolId}`
@@ -64,16 +65,12 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
       if (response.ok) {
         const { data } = await response.json();
-        console.log('🚀 ~ fetchPool ~ data:', data);
-        setPool(data);
-        // Calculate redemptions left
-        const totalRedemptions = data.total_redemptions || 0;
-        setRedemptionsLeft(data.max_wallets - totalRedemptions);
+        setPool(data.pool);
+        setRedeemedPool(data.redeemed);
       } else {
         toast.error('Failed to fetch pool details');
       }
     } catch (error) {
-      console.error('Error fetching pool:', error);
       toast.error('Failed to fetch pool details');
     }
   };
@@ -87,6 +84,17 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
     try {
       setLoading(true);
+
+      const checkWalletRedeemed = redeemedPool.map(
+        (item) => item.userWallet === publicKey.toBase58()
+      );
+
+      if (checkWalletRedeemed) {
+        throw Error(
+          'Maximum redeemption limit reached for this wallet'
+        );
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/redeemToken`,
         {
@@ -101,27 +109,9 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         }
       );
 
+      const data = await response.json();
+
       if (response.ok) {
-        // Deserialize the signed transaction
-        // const transaction = Transaction.from(
-        //   Buffer.from(data.signedTransaction, 'base64')
-        // );
-
-        // // Send the signed transaction
-        // const signature = await connection.sendRawTransaction(
-        //   transaction.serialize()
-        // );
-
-        // // Wait for confirmation
-        // const confirmation = await connection.confirmTransaction(
-        //   signature,
-        //   'confirmed'
-        // );
-
-        // if (confirmation.value.err) {
-        //   throw new Error('Failed to confirm transaction');
-        // }
-
         toast.success(
           `Successfully redeemed ${formatAmount(
             pool.tokens_per_wallet,
@@ -131,10 +121,9 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         setRedeemed(true);
         await fetchPool(); // Refresh pool data
       } else {
-        toast.error('Failed to redeem tokens');
+        toast.error(data.message || 'Failed to redeem tokens');
       }
     } catch (error: any) {
-      console.error('Error redeeming tokens:', error);
       toast.error(error.message || 'Failed to redeem tokens');
     } finally {
       setLoading(false);
@@ -265,7 +254,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 Redeem {pool.token_name}
               </CardTitle>
               <CardDescription>
-                {redemptionsLeft} redemptions remaining
+                {pool.max_wallets - redeemedPool.length} redemptions
+                remaining
               </CardDescription>
             </div>
           </div>
