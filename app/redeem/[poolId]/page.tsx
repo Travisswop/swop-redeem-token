@@ -58,15 +58,19 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const fetchPool = async () => {
     console.log('fetching pool', poolId);
     try {
-      const response = await fetch(`/api/redeem/${poolId}`);
-      const data = await response.json();
-      if (data.success) {
-        setPool(data.pool);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/getRedeemTokenFromPool/${poolId}`
+      );
+
+      if (response.ok) {
+        const { data } = await response.json();
+        console.log('🚀 ~ fetchPool ~ data:', data);
+        setPool(data);
         // Calculate redemptions left
-        const totalRedemptions = data.pool.total_redemptions || 0;
-        setRedemptionsLeft(data.pool.max_wallets - totalRedemptions);
+        const totalRedemptions = data.total_redemptions || 0;
+        setRedemptionsLeft(data.max_wallets - totalRedemptions);
       } else {
-        toast.error(data.message || 'Failed to fetch pool details');
+        toast.error('Failed to fetch pool details');
       }
     } catch (error) {
       console.error('Error fetching pool:', error);
@@ -84,7 +88,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     try {
       setLoading(true);
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/redeemSwop`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/redeemToken`,
         {
           method: 'POST',
           headers: {
@@ -92,9 +96,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           },
           body: JSON.stringify({
             userWallet: publicKey.toBase58(),
-            amount: pool.tokens_per_wallet,
-            privateKey: pool.temp_account_private_key,
-            tokenMint: pool.token_mint,
+            poolId: pool.pool_id,
           }),
         }
       );
