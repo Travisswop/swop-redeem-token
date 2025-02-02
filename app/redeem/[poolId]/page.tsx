@@ -38,7 +38,7 @@ interface RedemptionPool {
 
 interface RedeemedPool {
   amount: string;
-  userWallet: string;
+  user_wallet: string;
 }
 
 export default function RedeemPage({ params }: RedeemPageProps) {
@@ -85,10 +85,9 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     try {
       setLoading(true);
 
-      const checkWalletRedeemed = redeemedPool.map(
-        (item) => item.userWallet === publicKey.toBase58()
+      const checkWalletRedeemed = redeemedPool.find(
+        (item) => item.user_wallet === publicKey.toBase58()
       );
-
       if (checkWalletRedeemed) {
         throw Error(
           'Maximum redeemption limit reached for this wallet'
@@ -276,7 +275,10 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
             <Button
               onClick={handleRedeem}
-              disabled={loading}
+              disabled={
+                loading ||
+                pool.max_wallets - redeemedPool.length === 0
+              }
               className="w-full h-12 text-lg"
               variant="outline"
             >
@@ -285,6 +287,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   <span>Redeeming...</span>
                 </div>
+              ) : pool.max_wallets - redeemedPool.length === 0 ? (
+                'No redemptions remaining'
               ) : (
                 `Redeem ${formatAmount(
                   pool.tokens_per_wallet,
