@@ -12,7 +12,9 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import Image from 'next/image';
+import { PublicKey } from '@solana/web3.js';
 
 interface RedeemPageProps {
   params: {
@@ -50,12 +52,15 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [redeemedPool, setRedeemedPool] = useState<RedeemedPool[]>(
     []
   );
+  const [manualWalletAddress, setManualWalletAddress] = useState('');
+  const [isManualInput, setIsManualInput] = useState(false);
+  const [inputError, setInputError] = useState('');
 
   useEffect(() => {
-    if (connected) {
+    if (connected || isManualInput) {
       fetchPool();
     }
-  }, [connected]);
+  }, [connected, isManualInput]);
 
   const fetchPool = async () => {
     try {
@@ -79,18 +84,48 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     return (amount / Math.pow(10, decimals)).toFixed(2);
   };
 
+  const validateSolanaAddress = (address: string): boolean => {
+    try {
+      new PublicKey(address);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const handleManualWalletChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const address = e.target.value;
+    setManualWalletAddress(address);
+    if (address && !validateSolanaAddress(address)) {
+      setInputError('Invalid Solana address');
+    } else {
+      setInputError('');
+    }
+  };
+
   const handleRedeem = async () => {
-    if (!publicKey || !pool) return;
+    const walletToUse = isManualInput
+      ? manualWalletAddress
+      : publicKey?.toBase58();
+
+    if (!walletToUse || !pool) return;
+
+    if (isManualInput && !validateSolanaAddress(walletToUse)) {
+      toast.error('Invalid Solana address');
+      return;
+    }
 
     try {
       setLoading(true);
 
       const checkWalletRedeemed = redeemedPool.find(
-        (item) => item.user_wallet === publicKey.toBase58()
+        (item) => item.user_wallet === walletToUse
       );
       if (checkWalletRedeemed) {
         throw Error(
-          'Maximum redeemption limit reached for this wallet'
+          'Maximum redemption limit reached for this wallet'
         );
       }
 
@@ -102,7 +137,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            userWallet: publicKey.toBase58(),
+            userWallet: walletToUse,
             poolId: pool.pool_id,
           }),
         }
@@ -118,7 +153,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           )} ${pool.token_name}!`
         );
         setRedeemed(true);
-        await fetchPool(); // Refresh pool data
+        await fetchPool();
       } else {
         toast.error(data.message || 'Failed to redeem tokens');
       }
@@ -182,7 +217,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     );
   }
 
-  if (!connected) {
+  if (!connected && !isManualInput) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-lg">
         <Card>
@@ -207,9 +242,10 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 Connect Your Wallet
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Connect your Solana wallet to redeem tokens
+                Connect your Solana wallet or enter your wallet
+                address to redeem tokens
               </p>
-              <div className="mt-4">
+              <div className="mt-4 space-y-4">
                 <WalletMultiButton
                   style={{
                     backgroundColor: 'white',
@@ -217,6 +253,23 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                     border: '1px solid black',
                   }}
                 />
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      or
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setIsManualInput(true)}
+                >
+                  Enter Wallet Address
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -262,22 +315,59 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         <CardContent>
           <div className="space-y-6">
             <div className="p-4 bg-muted/50 rounded-lg">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Connected Wallet
-                </p>
-                <p className="text-sm font-medium truncate">
-                  {publicKey?.toBase58().slice(0, 8)}...
-                  {publicKey?.toBase58().slice(-4)}
-                </p>
-              </div>
+              {isManualInput ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Enter Wallet Address
+                  </p>
+                  <Input
+                    value={manualWalletAddress}
+                    onChange={handleManualWalletChange}
+                    placeholder="Solana wallet address"
+                    className={inputError ? 'border-red-500' : ''}
+                  />
+                  {inputError && (
+                    <p className="text-xs text-red-500">
+                      {inputError}
+                    </p>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setIsManualInput(false)}
+                  >
+                    Switch to Wallet Connection
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Connected Wallet
+                  </p>
+                  <p className="text-sm font-medium truncate">
+                    {publicKey?.toBase58().slice(0, 8)}...
+                    {publicKey?.toBase58().slice(-4)}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setIsManualInput(true)}
+                  >
+                    Switch to Manual Input
+                  </Button>
+                </div>
+              )}
             </div>
 
             <Button
               onClick={handleRedeem}
               disabled={
                 loading ||
-                pool.max_wallets - redeemedPool.length === 0
+                pool.max_wallets - redeemedPool.length === 0 ||
+                (isManualInput &&
+                  (!manualWalletAddress || !!inputError))
               }
               className="w-full h-12 text-lg"
               variant="outline"
