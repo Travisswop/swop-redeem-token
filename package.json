@@ -15,6 +15,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.98.0",
+    "@tanstack/react-query": "^5.81.5",
     "@types/node": "20.8.3",
     "@types/react": "18.2.25",
     "@types/react-dom": "18.2.11",

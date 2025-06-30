@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
@@ -43,6 +43,53 @@ interface RedeemedPool {
   user_wallet: string;
 }
 
+const validateSolanaAddress = (address: string): boolean => {
+  try {
+    new PublicKey(address);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+async function fetchReceiverWallet(ensName: string): Promise<string> {
+  if (!ensName) return '';
+
+  if (ensName.endsWith('.swop.id')) {
+    const url = `https://app.apiswop.co/api/v4/wallet/getEnsAddress/${ensName}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Failed to fetch ENS address');
+    }
+    const data = await response.json();
+
+    return data.addresses['501'];
+  } else {
+    // Handle Solana address
+    if (!validateSolanaAddress(ensName)) {
+      throw new Error('Invalid Solana address');
+    }
+    return ensName;
+  }
+}
+
+// Debounce hook for search optimization
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function RedeemPage({ params }: RedeemPageProps) {
   const { poolId } = params;
   const { publicKey, connected } = useWallet();
@@ -52,17 +99,73 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [redeemedPool, setRedeemedPool] = useState<RedeemedPool[]>(
     []
   );
-  const [manualWalletAddress, setManualWalletAddress] = useState('');
   const [isManualInput, setIsManualInput] = useState(false);
-  const [inputError, setInputError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState<string>('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string>('');
 
+  // Debounce the search query to avoid excessive API calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
+  // Memoize the wallet validation
+  const isValidWallet = useMemo(() => {
+    if (!searchResult) return false;
+    return validateSolanaAddress(searchResult);
+  }, [searchResult]);
+
+  // Memoize the redemption status
+  const hasRedeemed = useMemo(() => {
+    if (!searchResult && !publicKey) return false;
+    const walletToCheck = searchResult || publicKey?.toBase58();
+    return redeemedPool.some(
+      (item) => item.user_wallet === walletToCheck
+    );
+  }, [searchResult, publicKey, redeemedPool]);
+
+  // Memoize remaining redemptions
+  const remainingRedemptions = useMemo(() => {
+    return pool ? pool.max_wallets - redeemedPool.length : 0;
+  }, [pool, redeemedPool]);
+
+  // Search effect
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!debouncedSearchQuery.trim()) {
+        setSearchResult('');
+        setSearchError('');
+        return;
+      }
+
+      setIsSearching(true);
+      setSearchError('');
+
+      try {
+        const result = await fetchReceiverWallet(
+          debouncedSearchQuery
+        );
+        setSearchResult(result);
+      } catch (error: any) {
+        setSearchError(
+          error.message || 'Invalid address or ENS name'
+        );
+        setSearchResult('');
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    performSearch();
+  }, [debouncedSearchQuery]);
+
+  // Pool fetching effect
   useEffect(() => {
     if (connected || isManualInput) {
       fetchPool();
     }
   }, [connected, isManualInput]);
 
-  const fetchPool = async () => {
+  const fetchPool = useCallback(async () => {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/getRedeemTokenFromPool/${poolId}`
@@ -78,56 +181,44 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     } catch (error) {
       toast.error('Failed to fetch pool details');
     }
-  };
+  }, [poolId]);
 
-  const formatAmount = (amount: number, decimals: number) => {
-    return (amount / Math.pow(10, decimals)).toFixed(2);
-  };
+  const formatAmount = useCallback(
+    (amount: number, decimals: number) => {
+      return (amount / Math.pow(10, decimals)).toFixed(2);
+    },
+    []
+  );
 
-  const validateSolanaAddress = (address: string): boolean => {
-    try {
-      new PublicKey(address);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+    },
+    []
+  );
 
-  const handleManualWalletChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const address = e.target.value;
-    setManualWalletAddress(address);
-    if (address && !validateSolanaAddress(address)) {
-      setInputError('Invalid Solana address');
-    } else {
-      setInputError('');
-    }
-  };
-
-  const handleRedeem = async () => {
+  const handleRedeem = useCallback(async () => {
     const walletToUse = isManualInput
-      ? manualWalletAddress
+      ? searchResult
       : publicKey?.toBase58();
 
-    if (!walletToUse || !pool) return;
+    if (!walletToUse || !pool) {
+      toast.error('Please provide a valid wallet address');
+      return;
+    }
 
-    if (isManualInput && !validateSolanaAddress(walletToUse)) {
+    if (isManualInput && !isValidWallet) {
       toast.error('Invalid Solana address');
+      return;
+    }
+
+    if (hasRedeemed) {
+      toast.error('Maximum redemption limit reached for this wallet');
       return;
     }
 
     try {
       setLoading(true);
-
-      const checkWalletRedeemed = redeemedPool.find(
-        (item) => item.user_wallet === walletToUse
-      );
-      if (checkWalletRedeemed) {
-        throw Error(
-          'Maximum redemption limit reached for this wallet'
-        );
-      }
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/redeemToken`,
@@ -162,7 +253,16 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    isManualInput,
+    searchResult,
+    publicKey,
+    pool,
+    isValidWallet,
+    hasRedeemed,
+    formatAmount,
+    fetchPool,
+  ]);
 
   if (redeemed && pool) {
     return (
@@ -306,8 +406,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 Redeem {pool.token_name}
               </CardTitle>
               <CardDescription>
-                {pool.max_wallets - redeemedPool.length} redemptions
-                remaining
+                {remainingRedemptions} redemptions remaining
               </CardDescription>
             </div>
           </div>
@@ -316,26 +415,64 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           <div className="space-y-6">
             <div className="p-4 bg-muted/50 rounded-lg">
               {isManualInput ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Enter Wallet Address
-                  </p>
-                  <Input
-                    value={manualWalletAddress}
-                    onChange={handleManualWalletChange}
-                    placeholder="Solana wallet address"
-                    className={inputError ? 'border-red-500' : ''}
-                  />
-                  {inputError && (
-                    <p className="text-xs text-red-500">
-                      {inputError}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Enter Wallet Address or ENS Name
                     </p>
+                    <Input
+                      placeholder="e.g., wallet address or name.swop.id"
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      className={searchError ? 'border-red-500' : ''}
+                    />
+                  </div>
+
+                  {/* Search Status Indicators */}
+                  {isSearching && (
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                      <span>Searching...</span>
+                    </div>
                   )}
+
+                  {searchResult && !searchError && (
+                    <div className="p-2 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-xs text-green-700 font-medium">
+                        Found wallet:
+                      </p>
+                      <p className="text-xs text-green-600 break-all font-mono">
+                        {searchResult}
+                      </p>
+                    </div>
+                  )}
+
+                  {searchError && (
+                    <div className="p-2 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-xs text-red-700">
+                        {searchError}
+                      </p>
+                    </div>
+                  )}
+
+                  {hasRedeemed && (
+                    <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-xs text-yellow-700">
+                        This wallet has already redeemed tokens from
+                        this pool
+                      </p>
+                    </div>
+                  )}
+
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-2"
-                    onClick={() => setIsManualInput(false)}
+                    onClick={() => {
+                      setIsManualInput(false);
+                      setSearchQuery('');
+                      setSearchResult('');
+                      setSearchError('');
+                    }}
                   >
                     Switch to Wallet Connection
                   </Button>
@@ -349,6 +486,14 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                     {publicKey?.toBase58().slice(0, 8)}...
                     {publicKey?.toBase58().slice(-4)}
                   </p>
+                  {hasRedeemed && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-xs text-yellow-700">
+                        This wallet has already redeemed tokens from
+                        this pool
+                      </p>
+                    </div>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -365,9 +510,9 @@ export default function RedeemPage({ params }: RedeemPageProps) {
               onClick={handleRedeem}
               disabled={
                 loading ||
-                pool.max_wallets - redeemedPool.length === 0 ||
-                (isManualInput &&
-                  (!manualWalletAddress || !!inputError))
+                remainingRedemptions === 0 ||
+                hasRedeemed ||
+                (isManualInput && (!searchResult || !isValidWallet))
               }
               className="w-full h-12 text-lg"
               variant="outline"
@@ -377,8 +522,10 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   <span>Redeeming...</span>
                 </div>
-              ) : pool.max_wallets - redeemedPool.length === 0 ? (
+              ) : remainingRedemptions === 0 ? (
                 'No redemptions remaining'
+              ) : hasRedeemed ? (
+                'Already redeemed'
               ) : (
                 `Redeem ${formatAmount(
                   pool.tokens_per_wallet,
