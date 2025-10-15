@@ -56,7 +56,7 @@ async function fetchReceiverWallet(ensName: string): Promise<string> {
   if (!ensName) return '';
 
   if (ensName.endsWith('.swop.id')) {
-    const url = `https://app.apiswop.co/api/v4/wallet/getEnsAddress/${ensName}`;
+    const url = `/api/proxy/getEnsAddress/${ensName}`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Failed to fetch ENS address');
@@ -168,7 +168,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const fetchPool = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/getRedeemTokenFromPool/${poolId}`
+        `/api/proxy/getRedeemTokenFromPool/${poolId}`
       );
 
       if (response.ok) {
@@ -220,19 +220,16 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/redeemToken`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userWallet: walletToUse,
-            poolId: pool.pool_id,
-          }),
-        }
-      );
+      const response = await fetch(`/api/proxy/redeemToken`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userWallet: walletToUse,
+          poolId: pool.pool_id,
+        }),
+      });
 
       const data = await response.json();
 
