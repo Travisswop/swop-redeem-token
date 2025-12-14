@@ -192,7 +192,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchQuery(e.target.value);
+      setSearchQuery((e.target.value).toLowerCase());
     },
     []
   );
