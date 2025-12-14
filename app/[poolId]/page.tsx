@@ -56,7 +56,7 @@ async function fetchReceiverWallet(ensName: string): Promise<string> {
   if (!ensName) return '';
 
   if (ensName.endsWith('.swop.id')) {
-    const url = `/api/proxy/getEnsAddress/${ensName}`;
+    const url = `/api/proxy/getEnsAddress/${ensName.toLowerCase()}`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Failed to fetch ENS address');
@@ -192,7 +192,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchQuery((e.target.value).toLowerCase());
+      setSearchQuery(e.target.value);
     },
     []
   );
