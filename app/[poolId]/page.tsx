@@ -57,7 +57,7 @@ async function fetchReceiverWallet(ensName: string): Promise<string> {
 
   if (ensName.endsWith('.swop.id')) {
     const url = `/api/proxy/getEnsAddress/${ensName.toLowerCase()}`;
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error('Failed to fetch ENS address');
     }
@@ -168,7 +168,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const fetchPool = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/proxy/getRedeemTokenFromPool/${poolId}`
+        `/api/proxy/getRedeemTokenFromPool/${poolId}`,
+        { cache: 'no-store' }
       );
 
       if (response.ok) {
@@ -243,7 +244,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         setRedeemed(true);
         await fetchPool();
       } else {
-        toast.error(data.message || 'Failed to redeem tokens');
+        toast.error(data.error || 'Failed to redeem tokens');
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to redeem tokens');
@@ -260,6 +261,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     formatAmount,
     fetchPool,
   ]);
+
+  console.log('pool', pool)
 
   if (redeemed && pool) {
     return (

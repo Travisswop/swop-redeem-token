@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
         userWallet,
         poolId,
       }),
+      cache: 'no-store',
     });
 
     const data = await response.json();
