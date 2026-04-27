@@ -104,6 +104,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [searchResult, setSearchResult] = useState<string>('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string>('');
+  const [poolFetched, setPoolFetched] = useState(false);
+  const [poolNotFound, setPoolNotFound] = useState(false);
 
   // Debounce the search query to avoid excessive API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -158,7 +160,12 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     performSearch();
   }, [debouncedSearchQuery]);
 
-  // Pool fetching effect
+  // Check pool existence on mount
+  useEffect(() => {
+    fetchPool();
+  }, []);
+
+  // Re-fetch when wallet connects or manual input mode starts
   useEffect(() => {
     if (connected || isManualInput) {
       fetchPool();
@@ -174,13 +181,21 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
       if (response.ok) {
         const { data } = await response.json();
-        setPool(data.pool);
-        setRedeemedPool(data.redeemed);
+        if (!data.pool) {
+          setPoolNotFound(true);
+        } else {
+          setPool(data.pool);
+          setRedeemedPool(data.redeemed);
+        }
+      } else if (response.status === 404) {
+        setPoolNotFound(true);
       } else {
         toast.error('Failed to fetch pool details');
       }
     } catch (error) {
       toast.error('Failed to fetch pool details');
+    } finally {
+      setPoolFetched(true);
     }
   }, [poolId]);
 
@@ -263,6 +278,46 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   ]);
 
   console.log('pool', pool)
+
+  if (!poolFetched) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (poolNotFound) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-lg">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <svg
+                  className="h-6 w-6 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.5"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                  />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-medium">Redeem Link Not Found</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                This redeem link doesn&apos;t exist or may have expired. Please check the link and try again.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (redeemed && pool) {
     return (
