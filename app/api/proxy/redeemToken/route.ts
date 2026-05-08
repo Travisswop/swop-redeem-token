@@ -12,7 +12,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v2/desktop/wallet/redeemToken`;
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    if (!apiBaseUrl) {
+      return NextResponse.json(
+        { error: 'NEXT_PUBLIC_API_URL is not configured' },
+        { status: 500 }
+      );
+    }
+
+    const apiUrl = `${apiBaseUrl}/api/v2/desktop/wallet/redeemToken`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',

@@ -17,7 +17,16 @@ export async function GET(
     }
 
     if (ensName.endsWith('.swop.id')) {
-      const apiUrl = `https://app.apiswop.co/api/v4/wallet/getEnsAddress/${ensName}`;
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+      if (!apiBaseUrl) {
+        return NextResponse.json(
+          { error: 'NEXT_PUBLIC_API_URL is not configured' },
+          { status: 500 }
+        );
+      }
+
+      const apiUrl = `${apiBaseUrl}/api/v4/wallet/getEnsAddress/${ensName}`;
 
       const response = await fetch(apiUrl, {
         method: 'GET',

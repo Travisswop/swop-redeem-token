@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { poolId: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { poolId } = params;
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     if (!apiBaseUrl) {
@@ -17,7 +13,22 @@ export async function GET(
       );
     }
 
-    const apiUrl = `${apiBaseUrl}/api/v2/desktop/wallet/getRedeemTokenFromPool/${poolId}`;
+    const { searchParams } = new URL(request.url);
+    const query = (searchParams.get('q') || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, '')
+      .replace(/\.swop\.id$/, '')
+      .replace(/[^a-z0-9_]/g, '');
+
+    if (query.length < 2) {
+      return NextResponse.json({ data: { results: [] } });
+    }
+
+    const limit = searchParams.get('limit') || '6';
+    const apiUrl = new URL(`${apiBaseUrl}/api/v1/user/search-swop-id`);
+    apiUrl.searchParams.set('q', query);
+    apiUrl.searchParams.set('limit', limit);
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -29,7 +40,7 @@ export async function GET(
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: 'Failed to fetch pool details' },
+        { error: 'Failed to fetch Swop ID suggestions' },
         { status: response.status }
       );
     }
@@ -37,7 +48,7 @@ export async function GET(
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching pool details:', error);
+    console.error('Error fetching Swop ID suggestions:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
