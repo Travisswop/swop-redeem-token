@@ -172,6 +172,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [poolFetched, setPoolFetched] = useState(false);
   const [poolNotFound, setPoolNotFound] = useState(false);
   const [poolLoadError, setPoolLoadError] = useState('');
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
 
   const debouncedDestination = useDebounce(destination, 450);
 
@@ -227,7 +228,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   );
 
   const swopUsername = useMemo(() => cleanSwopId(destination), [destination]);
-  const showSuggestions = destinationType === 'swop' && swopUsername.length >= 2;
+  const debouncedSwopUsername = useMemo(() => cleanSwopId(debouncedDestination), [debouncedDestination]);
+  const showSuggestions = destinationType === 'swop' && swopUsername.length >= 2 && !suggestionDismissed;
 
   const destinationLabel = useMemo(() => {
     if (!destination.trim()) return '';
@@ -301,7 +303,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     let active = true;
 
     const loadSuggestions = async () => {
-      if (destinationType !== 'swop' || swopUsername.length < 2) {
+      const debouncedType = getDestinationType(debouncedDestination);
+      if (debouncedType !== 'swop' || debouncedSwopUsername.length < 2) {
         setSuggestions([]);
         setIsSearchingSuggestions(false);
         return;
@@ -310,7 +313,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
       setIsSearchingSuggestions(true);
 
       try {
-        const results = await fetchSwopIdSuggestions(swopUsername);
+        const results = await fetchSwopIdSuggestions(debouncedSwopUsername);
         if (active) setSuggestions(results);
       } catch (error) {
         if (active) setSuggestions([]);
@@ -324,12 +327,13 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     return () => {
       active = false;
     };
-  }, [destinationType, swopUsername]);
+  }, [debouncedDestination, debouncedSwopUsername]);
 
   const handleDestinationChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setDestination(e.target.value);
       setRedeemed(false);
+      setSuggestionDismissed(false);
     },
     []
   );
@@ -540,7 +544,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 {suggestions.map((suggestion) => (
                   <button
                     key={suggestion.id}
-                    onClick={() => setDestination(suggestion.ens)}
+                    onClick={() => { setDestination(cleanSwopId(suggestion.ens)); setSuggestionDismissed(true); }}
                   >
                     <span className="suggestion-avatar">
                       {suggestion.name?.slice(0, 1) || '@'}
@@ -552,7 +556,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                   </button>
                 ))}
                 {!isSearchingSuggestions && suggestions.length === 0 && (
-                  <button onClick={() => setDestination(swopUsername)}>
+                  <button onClick={() => { setDestination(swopUsername); setSuggestionDismissed(true); }}>
                     <span className="suggestion-avatar">@</span>
                     <span className="suggestion-copy">
                       <strong>{swopUsername}.swop.id</strong>
@@ -1119,7 +1123,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           color: #000;
           cursor: pointer;
           font-size: 16px;
-          font-weight: 850;
+          font-weight: 800;
           letter-spacing: 0.05em;
           margin-top: 18px;
           min-height: 56px;
@@ -1235,7 +1239,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         .claimed-state h2 {
           animation: claim-copy-in 0.45s ease-out 0.22s both;
           font-size: 16px;
-          font-weight: 850;
+          font-weight: 800;
           letter-spacing: -0.01em;
           position: relative;
           z-index: 2;

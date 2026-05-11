@@ -30,10 +30,11 @@ const cleanSwopId = (value: string) =>
 
 export default function Home() {
   const [destination, setDestination] = useState('');
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const cleanedSwopId = cleanSwopId(destination);
   const isWallet = validateSolanaAddress(destination.trim());
   const isValid = destination.trim().length >= 3;
-  const showSuggestions = !isWallet && cleanedSwopId.length >= 2;
+  const showSuggestions = !isWallet && cleanedSwopId.length >= 2 && !suggestionDismissed;
 
   return (
     <main className="min-h-screen w-full bg-black px-0 py-0 text-white sm:px-4 sm:py-6">
@@ -84,7 +85,10 @@ export default function Home() {
               <span className="prefix">{isWallet ? '#' : '@'}</span>
               <input
                 value={destination}
-                onChange={(event) => setDestination(event.target.value)}
+                onChange={(event) => {
+                  setDestination(event.target.value);
+                  setSuggestionDismissed(false);
+                }}
                 placeholder="yourname or wallet"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -95,12 +99,12 @@ export default function Home() {
 
             {showSuggestions && (
               <div className="suggestions-popover">
-                <button onClick={() => setDestination(cleanedSwopId)}>
+                <button onClick={() => { setDestination(cleanedSwopId); setSuggestionDismissed(true); }}>
                   <span>@{cleanedSwopId}</span>
                   <strong>{cleanedSwopId}.swop.id</strong>
                 </button>
                 <button
-                  onClick={() => setDestination(`${cleanedSwopId}.swop.id`)}
+                  onClick={() => { setDestination(cleanedSwopId); setSuggestionDismissed(true); }}
                 >
                   <span>search</span>
                   <strong>{cleanedSwopId}.swop.id</strong>
@@ -112,7 +116,7 @@ export default function Home() {
               {!destination.trim() && (
                 <span>No swop.id yet? Get one free in the Swop app.</span>
               )}
-              {destination.trim() && (
+              {destination.trim() && isValid && (
                 <span className="ok">
                   {isWallet
                     ? 'Wallet detected. Open a real drop link to claim.'
