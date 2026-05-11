@@ -30,11 +30,10 @@ const cleanSwopId = (value: string) =>
 
 export default function Home() {
   const [destination, setDestination] = useState('');
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const cleanedSwopId = cleanSwopId(destination);
   const isWallet = validateSolanaAddress(destination.trim());
   const isValid = destination.trim().length >= 3;
-  const showSuggestions = !isWallet && cleanedSwopId.length >= 2 && !suggestionDismissed;
+  const showSuggestions = !isWallet && cleanedSwopId.length >= 2;
 
   return (
     <main className="min-h-screen w-full bg-black px-0 py-0 text-white sm:px-4 sm:py-6">
@@ -85,10 +84,7 @@ export default function Home() {
               <span className="prefix">{isWallet ? '#' : '@'}</span>
               <input
                 value={destination}
-                onChange={(event) => {
-                  setDestination(event.target.value);
-                  setSuggestionDismissed(false);
-                }}
+                onChange={(event) => setDestination(event.target.value)}
                 placeholder="yourname or wallet"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -99,12 +95,12 @@ export default function Home() {
 
             {showSuggestions && (
               <div className="suggestions-popover">
-                <button onClick={() => { setDestination(cleanedSwopId); setSuggestionDismissed(true); }}>
+                <button onClick={() => setDestination(cleanedSwopId)}>
                   <span>@{cleanedSwopId}</span>
                   <strong>{cleanedSwopId}.swop.id</strong>
                 </button>
                 <button
-                  onClick={() => { setDestination(cleanedSwopId); setSuggestionDismissed(true); }}
+                  onClick={() => setDestination(`${cleanedSwopId}.swop.id`)}
                 >
                   <span>search</span>
                   <strong>{cleanedSwopId}.swop.id</strong>
@@ -114,9 +110,17 @@ export default function Home() {
 
             <div className="hint-line">
               {!destination.trim() && (
-                <span>No swop.id yet? Get one free in the Swop app.</span>
+                <span>
+                  No swop.id yet? Get one free in the{' '}
+                  <a
+                    href="https://swopme.co"
+                  >
+                    Swop app
+                  </a>
+                  .
+                </span>
               )}
-              {destination.trim() && isValid && (
+              {destination.trim() && (
                 <span className="ok">
                   {isWallet
                     ? 'Wallet detected. Open a real drop link to claim.'
@@ -381,6 +385,19 @@ export default function Home() {
           letter-spacing: 0.06em;
           margin-top: 18px;
           min-height: 18px;
+        }
+
+        .hint-line a {
+          color: ${ACCENT};
+          cursor: pointer;
+          pointer-events: auto;
+          position: relative;
+          text-decoration: none;
+          z-index: 4;
+        }
+
+        .hint-line a:hover {
+          text-decoration: underline;
         }
 
         .suggestions-popover {

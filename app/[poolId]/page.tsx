@@ -172,7 +172,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [poolFetched, setPoolFetched] = useState(false);
   const [poolNotFound, setPoolNotFound] = useState(false);
   const [poolLoadError, setPoolLoadError] = useState('');
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
 
   const debouncedDestination = useDebounce(destination, 450);
 
@@ -228,8 +227,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   );
 
   const swopUsername = useMemo(() => cleanSwopId(destination), [destination]);
-  const debouncedSwopUsername = useMemo(() => cleanSwopId(debouncedDestination), [debouncedDestination]);
-  const showSuggestions = destinationType === 'swop' && swopUsername.length >= 2 && !suggestionDismissed;
+  const showSuggestions = destinationType === 'swop' && swopUsername.length >= 2;
 
   const destinationLabel = useMemo(() => {
     if (!destination.trim()) return '';
@@ -303,8 +301,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     let active = true;
 
     const loadSuggestions = async () => {
-      const debouncedType = getDestinationType(debouncedDestination);
-      if (debouncedType !== 'swop' || debouncedSwopUsername.length < 2) {
+      if (destinationType !== 'swop' || swopUsername.length < 2) {
         setSuggestions([]);
         setIsSearchingSuggestions(false);
         return;
@@ -313,7 +310,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
       setIsSearchingSuggestions(true);
 
       try {
-        const results = await fetchSwopIdSuggestions(debouncedSwopUsername);
+        const results = await fetchSwopIdSuggestions(swopUsername);
         if (active) setSuggestions(results);
       } catch (error) {
         if (active) setSuggestions([]);
@@ -327,13 +324,12 @@ export default function RedeemPage({ params }: RedeemPageProps) {
     return () => {
       active = false;
     };
-  }, [debouncedDestination, debouncedSwopUsername]);
+  }, [destinationType, swopUsername]);
 
   const handleDestinationChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setDestination(e.target.value);
       setRedeemed(false);
-      setSuggestionDismissed(false);
     },
     []
   );
@@ -510,6 +506,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         {redeemed ? (
           <ClaimedState
             destinationLabel={destinationLabel}
+            prizeAmount={prizeAmount}
+            tokenSymbol={pool.token_symbol}
             resetClaim={resetClaim}
           />
         ) : (
@@ -544,7 +542,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 {suggestions.map((suggestion) => (
                   <button
                     key={suggestion.id}
-                    onClick={() => { setDestination(cleanSwopId(suggestion.ens)); setSuggestionDismissed(true); }}
+                    onClick={() => setDestination(suggestion.ens)}
                   >
                     <span className="suggestion-avatar">
                       {suggestion.name?.slice(0, 1) || '@'}
@@ -556,7 +554,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                   </button>
                 ))}
                 {!isSearchingSuggestions && suggestions.length === 0 && (
-                  <button onClick={() => { setDestination(swopUsername); setSuggestionDismissed(true); }}>
+                  <button onClick={() => setDestination(swopUsername)}>
                     <span className="suggestion-avatar">@</span>
                     <span className="suggestion-copy">
                       <strong>{swopUsername}.swop.id</strong>
@@ -578,7 +576,15 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 </span>
               )}
               {!isResolving && !destination.trim() && (
-                <span>No swop.id yet? Get one free in the Swop app.</span>
+                <span>
+                  No swop.id yet? Get one free in the{' '}
+                  <a
+                    href="https://swopme.co"
+                  >
+                    Swop app
+                  </a>
+                  .
+                </span>
               )}
               {!isResolving && destinationError && (
                 <span className="error">{destinationError}</span>
@@ -938,6 +944,19 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           color: #ff6b6b;
         }
 
+        .hint-line a {
+          color: ${ACCENT};
+          cursor: pointer;
+          pointer-events: auto;
+          position: relative;
+          text-decoration: none;
+          z-index: 4;
+        }
+
+        .hint-line a:hover {
+          text-decoration: underline;
+        }
+
         .suggestions-popover {
           background: rgba(10, 10, 10, 0.96);
           border: 1px solid rgba(0, 255, 136, 0.22);
@@ -1123,7 +1142,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           color: #000;
           cursor: pointer;
           font-size: 16px;
-          font-weight: 800;
+          font-weight: 850;
           letter-spacing: 0.05em;
           margin-top: 18px;
           min-height: 56px;
@@ -1239,7 +1258,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
         .claimed-state h2 {
           animation: claim-copy-in 0.45s ease-out 0.22s both;
           font-size: 16px;
-          font-weight: 800;
+          font-weight: 850;
           letter-spacing: -0.01em;
           position: relative;
           z-index: 2;
@@ -1461,23 +1480,236 @@ function Sparkles() {
 
 function ClaimedState({
   destinationLabel,
+  prizeAmount,
+  tokenSymbol,
   resetClaim,
 }: {
   destinationLabel: string;
+  prizeAmount: string;
+  tokenSymbol: string;
   resetClaim: () => void;
 }) {
   return (
     <section className="claimed-state">
       <ConfettiBurst />
-      <div className="success-mark">
-        <CheckCircle2 className="h-9 w-9" />
+      <div className="claimed-card">
+        <div className="success-mark">
+          <CheckCircle2 className="h-9 w-9" />
+        </div>
+        <span className="success-eyebrow">CLAIM CONFIRMED</span>
+        <h2>
+          {prizeAmount} {tokenSymbol}
+        </h2>
+        <p>delivered to</p>
+        <strong>{destinationLabel}</strong>
+        <button className="reset-button" onClick={resetClaim}>
+          <RotateCcw className="h-4 w-4" />
+          CLAIM ANOTHER
+        </button>
       </div>
-      <h2>Drop claimed</h2>
-      <p>{destinationLabel}</p>
-      <button className="reset-button" onClick={resetClaim}>
-        <RotateCcw className="h-4 w-4" />
-        CLAIM ANOTHER
-      </button>
+
+      <style jsx>{`
+        .claimed-state {
+          align-items: center;
+          display: flex;
+          justify-content: center;
+          min-height: 310px;
+          overflow: hidden;
+          padding: 18px 0 4px;
+          position: relative;
+          text-align: center;
+        }
+
+        .claimed-state::before {
+          animation: success-scan 1.2s ease-out both;
+          background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(0, 255, 136, 0.16),
+            transparent
+          );
+          content: '';
+          height: 160%;
+          left: -90%;
+          position: absolute;
+          top: -30%;
+          transform: rotate(18deg);
+          width: 64%;
+        }
+
+        .claimed-card {
+          align-items: center;
+          background: linear-gradient(
+              180deg,
+              rgba(0, 255, 136, 0.08),
+              rgba(255, 255, 255, 0.025)
+            ),
+            rgba(5, 5, 5, 0.82);
+          border: 1px solid rgba(0, 255, 136, 0.28);
+          border-radius: 18px;
+          box-shadow: 0 22px 60px rgba(0, 0, 0, 0.38),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          display: flex;
+          flex-direction: column;
+          max-width: 100%;
+          padding: 28px 22px 20px;
+          position: relative;
+          width: 100%;
+          z-index: 2;
+        }
+
+        .success-mark {
+          align-items: center;
+          animation: success-pop 0.58s cubic-bezier(0.2, 1.5, 0.35, 1) both;
+          background: rgba(0, 255, 136, 0.12);
+          border: 1.5px solid ${ACCENT};
+          border-radius: 999px;
+          box-shadow: 0 0 34px rgba(0, 255, 136, 0.22);
+          color: ${ACCENT};
+          display: flex;
+          height: 76px;
+          justify-content: center;
+          margin-bottom: 18px;
+          position: relative;
+          width: 76px;
+        }
+
+        .success-mark::before,
+        .success-mark::after {
+          animation: success-ring 1.25s ease-out forwards;
+          border: 1px solid rgba(0, 255, 136, 0.5);
+          border-radius: 999px;
+          content: '';
+          inset: -10px;
+          opacity: 0;
+          position: absolute;
+        }
+
+        .success-mark::after {
+          animation-delay: 0.18s;
+          inset: -20px;
+        }
+
+        .success-eyebrow {
+          animation: claim-copy-in 0.42s ease-out 0.16s both;
+          color: ${ACCENT};
+          font-family: ${MONO};
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.24em;
+        }
+
+        .claimed-card h2 {
+          animation: claim-copy-in 0.42s ease-out 0.22s both;
+          color: #fff;
+          font-size: 30px;
+          font-weight: 900;
+          line-height: 1;
+          margin-top: 12px;
+        }
+
+        .claimed-card p {
+          animation: claim-copy-in 0.42s ease-out 0.3s both;
+          color: rgba(255, 255, 255, 0.44);
+          font-family: ${MONO};
+          font-size: 10px;
+          letter-spacing: 0.1em;
+          margin-top: 16px;
+          text-transform: uppercase;
+        }
+
+        .claimed-card strong {
+          animation: claim-copy-in 0.42s ease-out 0.36s both;
+          color: rgba(255, 255, 255, 0.86);
+          font-family: ${MONO};
+          font-size: 15px;
+          font-weight: 700;
+          margin-top: 7px;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .reset-button {
+          align-items: center;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          color: rgba(255, 255, 255, 0.7);
+          cursor: pointer;
+          display: inline-flex;
+          font-family: ${MONO};
+          font-size: 11px;
+          font-weight: 800;
+          gap: 8px;
+          justify-content: center;
+          letter-spacing: 0.12em;
+          margin-top: 22px;
+          min-height: 44px;
+          padding: 0 18px;
+          transition: border-color 0.18s, color 0.18s, transform 0.12s;
+        }
+
+        .reset-button:hover {
+          border-color: rgba(0, 255, 136, 0.32);
+          color: #fff;
+        }
+
+        .reset-button:active {
+          transform: scale(0.98);
+        }
+
+        @keyframes success-scan {
+          from {
+            opacity: 0;
+            transform: translateX(0) rotate(18deg);
+          }
+          30% {
+            opacity: 1;
+          }
+          to {
+            opacity: 0;
+            transform: translateX(340%) rotate(18deg);
+          }
+        }
+
+        @keyframes success-pop {
+          0% {
+            opacity: 0;
+            transform: scale(0.55);
+          }
+          70% {
+            transform: scale(1.08);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes success-ring {
+          0% {
+            opacity: 0.8;
+            transform: scale(0.62);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.65);
+          }
+        }
+
+        @keyframes claim-copy-in {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </section>
   );
 }
@@ -1506,29 +1738,50 @@ function ConfettiBurst() {
     );
   });
 
-  const chips = ['+', '01', '$', 'SW', 'ID', '✓', '11', '*', 'USDC', '↗'];
-
   return (
-    <>
+    <div className="confetti-layer" aria-hidden="true">
       {burstParticles}
-      {chips.map((chip, index) => (
-        <span
-          key={`chip-${chip}-${index}`}
-          className="confetti-chip"
-          style={
-            {
-              '--left': `${8 + index * 9}%`,
-              '--rotate': `${index % 2 === 0 ? -18 - index * 2 : 20 + index * 3}deg`,
-              '--fall': `${170 + (index % 4) * 22}px`,
-              '--color': index % 3 === 0 ? ACCENT : index % 3 === 1 ? '#ffffff' : '#91ffd0',
-              animationDelay: `${120 + index * 65}ms`,
-            } as React.CSSProperties
+
+      <style jsx>{`
+        .confetti-layer {
+          inset: 0;
+          overflow: hidden;
+          pointer-events: none;
+          position: absolute;
+          z-index: 1;
+        }
+
+        .burst-particle {
+          animation: burst-pop 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          background: var(--color);
+          border-radius: 999px;
+          box-shadow: 0 0 12px var(--color);
+          height: var(--size);
+          left: 50%;
+          opacity: 0;
+          position: absolute;
+          top: 34%;
+          transform: translate(-50%, -50%) rotate(var(--angle));
+          width: var(--size);
+        }
+
+        @keyframes burst-pop {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) rotate(var(--angle))
+              translateX(0) scale(0.4);
           }
-        >
-          {chip}
-        </span>
-      ))}
-    </>
+          16% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) rotate(var(--angle))
+              translateX(var(--distance)) scale(1);
+          }
+        }
+      `}</style>
+    </div>
   );
 }
 
