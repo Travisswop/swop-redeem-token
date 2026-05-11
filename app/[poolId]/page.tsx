@@ -256,13 +256,17 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   }, [fetchPool]);
 
   useEffect(() => {
+    let active = true;
+
     const resolveDestination = async () => {
       const value = debouncedDestination.trim();
 
       if (!value) {
-        setResolvedWallet('');
-        setDestinationError('');
-        setIsResolving(false);
+        if (active) {
+          setResolvedWallet('');
+          setDestinationError('');
+          setIsResolving(false);
+        }
         return;
       }
 
@@ -271,9 +275,11 @@ export default function RedeemPage({ params }: RedeemPageProps) {
       if (type === 'swop') {
         const username = cleanSwopId(value);
         if (username.length < 3) {
-          setResolvedWallet('');
-          setDestinationError('Username must be at least 3 characters.');
-          setIsResolving(false);
+          if (active) {
+            setResolvedWallet('');
+            setDestinationError('Username must be at least 3 characters.');
+            setIsResolving(false);
+          }
           return;
         }
       }
@@ -283,18 +289,29 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
       try {
         const wallet = await fetchReceiverWallet(value);
-        setResolvedWallet(wallet);
+        if (active) {
+          setResolvedWallet(wallet);
+          setDestinationError('');
+        }
       } catch (error: any) {
-        setResolvedWallet('');
-        setDestinationError(
-          error.message || 'Enter a swop.id username or a Solana wallet.'
-        );
+        if (active) {
+          setResolvedWallet('');
+          setDestinationError(
+            error.message || 'Enter a swop.id username or a Solana wallet.'
+          );
+        }
       } finally {
-        setIsResolving(false);
+        if (active) {
+          setIsResolving(false);
+        }
       }
     };
 
     resolveDestination();
+
+    return () => {
+      active = false;
+    };
   }, [debouncedDestination]);
 
   useEffect(() => {
