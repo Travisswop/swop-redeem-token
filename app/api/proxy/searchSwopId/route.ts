@@ -32,13 +32,15 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(apiUrl, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       cache: 'no-store',
     });
 
     if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      console.error(
+        `[searchSwopId] upstream ${response.status} for ${apiUrl}:`,
+        errorBody
+      );
       return NextResponse.json(
         { error: 'Failed to fetch Swop ID suggestions' },
         { status: response.status }

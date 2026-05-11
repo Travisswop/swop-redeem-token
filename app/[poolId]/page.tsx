@@ -43,19 +43,6 @@ interface RedeemedPool {
 
 type DestinationType = 'swop' | 'wallet' | null;
 
-interface SwopIdSuggestion {
-  id: string;
-  name: string;
-  username: string;
-  profilePic?: string;
-  profileUrl?: string;
-  ens: string;
-  primary?: boolean;
-  ensData?: {
-    evmAddress?: string;
-    solanaAddress?: string;
-  };
-}
 
 const ACCENT = '#00ff88';
 const MONO =
@@ -126,19 +113,6 @@ async function fetchReceiverWallet(input: string): Promise<string> {
   return wallet;
 }
 
-async function fetchSwopIdSuggestions(
-  query: string
-): Promise<SwopIdSuggestion[]> {
-  const response = await fetch(
-    `/api/proxy/searchSwopId?q=${encodeURIComponent(query)}&limit=5`,
-    { cache: 'no-store' }
-  );
-
-  if (!response.ok) return [];
-
-  const data = await response.json();
-  return data?.data?.results || [];
-}
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -167,8 +141,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [resolvedWallet, setResolvedWallet] = useState('');
   const [isResolving, setIsResolving] = useState(false);
   const [destinationError, setDestinationError] = useState('');
-  const [suggestions, setSuggestions] = useState<SwopIdSuggestion[]>([]);
-  const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
   const [poolFetched, setPoolFetched] = useState(false);
   const [poolNotFound, setPoolNotFound] = useState(false);
   const [poolLoadError, setPoolLoadError] = useState('');
@@ -227,7 +199,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   );
 
   const swopUsername = useMemo(() => cleanSwopId(destination), [destination]);
-  const showSuggestions = destinationType === 'swop' && swopUsername.length >= 2;
 
   const destinationLabel = useMemo(() => {
     if (!destination.trim()) return '';
@@ -296,35 +267,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
     resolveDestination();
   }, [debouncedDestination]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadSuggestions = async () => {
-      if (destinationType !== 'swop' || swopUsername.length < 2) {
-        setSuggestions([]);
-        setIsSearchingSuggestions(false);
-        return;
-      }
-
-      setIsSearchingSuggestions(true);
-
-      try {
-        const results = await fetchSwopIdSuggestions(swopUsername);
-        if (active) setSuggestions(results);
-      } catch (error) {
-        if (active) setSuggestions([]);
-      } finally {
-        if (active) setIsSearchingSuggestions(false);
-      }
-    };
-
-    loadSuggestions();
-
-    return () => {
-      active = false;
-    };
-  }, [destinationType, swopUsername]);
 
   const handleDestinationChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -510,6 +452,14 @@ export default function RedeemPage({ params }: RedeemPageProps) {
             tokenSymbol={pool.token_symbol}
             resetClaim={resetClaim}
           />
+        ) : remainingRedemptions === 0 ? (
+          <section className="drop-empty">
+            <div className="drop-empty-icon">
+              <AlertTriangle className="h-7 w-7" />
+            </div>
+            <h2>Drop is empty</h2>
+            <p>All tokens have been claimed. This drop has no remaining supply.</p>
+          </section>
         ) : (
           <section className="claim-form">
             <div className="input-label">
@@ -536,37 +486,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                 {destinationType === 'wallet' ? 'wallet' : '.swop.id'}
               </span>
             </div>
-
-            {showSuggestions && (
-              <div className="suggestions-popover">
-                {suggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.id}
-                    onClick={() => setDestination(suggestion.ens)}
-                  >
-                    <span className="suggestion-avatar">
-                      {suggestion.name?.slice(0, 1) || '@'}
-                    </span>
-                    <span className="suggestion-copy">
-                      <strong>{suggestion.ens}</strong>
-                      <span>{suggestion.name || suggestion.username}</span>
-                    </span>
-                  </button>
-                ))}
-                {!isSearchingSuggestions && suggestions.length === 0 && (
-                  <button onClick={() => setDestination(swopUsername)}>
-                    <span className="suggestion-avatar">@</span>
-                    <span className="suggestion-copy">
-                      <strong>{swopUsername}.swop.id</strong>
-                      <span>press claim to resolve exact match</span>
-                    </span>
-                  </button>
-                )}
-                {isSearchingSuggestions && (
-                  <div className="suggestion-loading">searching swop.id</div>
-                )}
-              </div>
-            )}
 
             <div className="hint-line">
               {isResolving && (
@@ -853,6 +772,46 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           padding-top: 16px;
         }
 
+        .drop-empty {
+          align-items: center;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 22px;
+          padding: 32px 0 12px;
+          text-align: center;
+        }
+
+        .drop-empty-icon {
+          align-items: center;
+          background: rgba(255, 80, 80, 0.1);
+          border: 1px solid rgba(255, 80, 80, 0.28);
+          border-radius: 999px;
+          color: #ff6b6b;
+          display: flex;
+          height: 56px;
+          justify-content: center;
+          margin-bottom: 6px;
+          width: 56px;
+        }
+
+        .drop-empty h2 {
+          color: #fff;
+          font-size: 18px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+
+        .drop-empty p {
+          color: rgba(255, 255, 255, 0.46);
+          font-family: ${MONO};
+          font-size: 11px;
+          letter-spacing: 0.04em;
+          line-height: 1.55;
+          max-width: 280px;
+        }
+
         .claim-form {
           margin-top: 22px;
         }
@@ -955,81 +914,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
 
         .hint-line a:hover {
           text-decoration: underline;
-        }
-
-        .suggestions-popover {
-          background: rgba(10, 10, 10, 0.96);
-          border: 1px solid rgba(0, 255, 136, 0.22);
-          border-radius: 10px;
-          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
-          display: grid;
-          gap: 6px;
-          margin-top: 8px;
-          padding: 8px;
-        }
-
-        .suggestions-popover button {
-          align-items: center;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          color: rgba(255, 255, 255, 0.72);
-          cursor: pointer;
-          display: flex;
-          font-family: ${MONO};
-          gap: 10px;
-          padding: 9px 10px;
-          text-align: left;
-        }
-
-        .suggestions-popover button:hover {
-          border-color: rgba(0, 255, 136, 0.36);
-        }
-
-        .suggestion-avatar {
-          align-items: center;
-          background: rgba(0, 255, 136, 0.1);
-          border: 1px solid rgba(0, 255, 136, 0.28);
-          border-radius: 50%;
-          color: ${ACCENT};
-          display: inline-flex;
-          flex: 0 0 28px;
-          font-size: 12px;
-          font-weight: 800;
-          height: 28px;
-          justify-content: center;
-          letter-spacing: 0;
-          text-transform: uppercase;
-        }
-
-        .suggestion-copy {
-          display: grid;
-          gap: 3px;
-          min-width: 0;
-        }
-
-        .suggestion-copy span,
-        .suggestion-loading {
-          color: rgba(255, 255, 255, 0.42);
-          font-family: ${MONO};
-          font-size: 9px;
-          letter-spacing: 0.08em;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .suggestion-copy strong {
-          color: rgba(255, 255, 255, 0.66);
-          font-size: 10px;
-          font-weight: 600;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .suggestion-loading {
-          padding: 10px;
         }
 
         .resolved-wallet {
