@@ -13,6 +13,10 @@ import {
   Loader2,
   RotateCcw,
 } from 'lucide-react';
+import {
+  getTokenImageFallbackSrc,
+  resolveTokenImageSrc,
+} from '@/lib/tokenImages';
 
 interface RedeemPageProps {
   params: {
@@ -144,6 +148,7 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   const [poolFetched, setPoolFetched] = useState(false);
   const [poolNotFound, setPoolNotFound] = useState(false);
   const [poolLoadError, setPoolLoadError] = useState('');
+  const [tokenImageFailed, setTokenImageFailed] = useState(false);
 
   const debouncedDestination = useDebounce(destination, 450);
 
@@ -221,6 +226,21 @@ export default function RedeemPage({ params }: RedeemPageProps) {
   }, [pool?.pool_id, poolId]);
 
   const expiryLabel = useMemo(() => getExpiryLabel(pool?.expires_at), [pool]);
+  const tokenImageSrc = useMemo(
+    () => resolveTokenImageSrc(pool?.token_logo, pool?.token_symbol),
+    [pool?.token_logo, pool?.token_symbol]
+  );
+  const tokenImageFallbackSrc = useMemo(
+    () => getTokenImageFallbackSrc(pool?.token_symbol),
+    [pool?.token_symbol]
+  );
+  const displayedTokenImageSrc = tokenImageFailed
+    ? tokenImageFallbackSrc
+    : tokenImageSrc;
+
+  useEffect(() => {
+    setTokenImageFailed(false);
+  }, [tokenImageSrc]);
 
   useEffect(() => {
     fetchPool();
@@ -409,8 +429,8 @@ export default function RedeemPage({ params }: RedeemPageProps) {
             <Image
               src="/swop-wordmark-white.png"
               alt="Swop"
-              width={96}
-              height={28}
+              width={76}
+              height={26}
               className="brand-logo"
               priority
             />
@@ -444,16 +464,16 @@ export default function RedeemPage({ params }: RedeemPageProps) {
                   in {pool.token_symbol}, ready to trade
                 </p>
               </div>
-              {pool.token_logo && (
-                <div className="token-mark">
-                  <Image
-                    src={pool.token_logo}
-                    alt={pool.token_name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              )}
+              <div className="token-mark">
+                <Image
+                  src={displayedTokenImageSrc}
+                  alt={pool.token_name || pool.token_symbol}
+                  fill
+                  sizes="58px"
+                  className="rounded-full object-contain p-1"
+                  onError={() => setTokenImageFailed(true)}
+                />
+              </div>
             </div>
             <div className="description">
               A welcome drop from Swop. Spend it, swap it, or stake it
@@ -662,11 +682,6 @@ export default function RedeemPage({ params }: RedeemPageProps) {
           display: flex;
           gap: 10px;
           min-width: 0;
-        }
-
-        .brand-logo {
-          height: auto;
-          width: 76px;
         }
 
         .slash {

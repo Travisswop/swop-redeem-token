@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { resolveTokenImageUrl, SWOP_ICON_PATH } from './tokenImages';
 
 export const ACTION_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -90,18 +91,8 @@ export function remainingClaims(pool: RedemptionPool, redeemed: RedemptionRecord
 }
 
 export function actionIcon(pool: RedemptionPool | null, baseUrl: string) {
-  const candidate = pool?.token_logo?.trim();
-  if (candidate) {
-    try {
-      const parsed = new URL(candidate);
-      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
-        return parsed.toString();
-      }
-    } catch {
-      // Fall through to the Swop icon.
-    }
-  }
-  return new URL('/swop-icon.svg', baseUrl).toString();
+  if (!pool) return new URL(SWOP_ICON_PATH, baseUrl).toString();
+  return resolveTokenImageUrl(pool.token_logo, pool.token_symbol, baseUrl);
 }
 
 export function shortAddress(address: string) {
@@ -155,7 +146,7 @@ export function buildActionResponse(
   if (!pool) {
     return {
       type: 'action',
-      icon: new URL('/swop-icon.svg', baseUrl).toString(),
+      icon: new URL(SWOP_ICON_PATH, baseUrl).toString(),
       title: 'Swop blink unavailable',
       description: 'This redeemable token link could not be found.',
       label: 'Unavailable',
