@@ -25,6 +25,38 @@ function lockedPackagePaths(packageName) {
   );
 }
 
+function versionAtLeast(version, minimum) {
+  const current = version.split('-')[0].split('.').map(Number);
+  const required = minimum.split('-')[0].split('.').map(Number);
+
+  for (let index = 0; index < Math.max(current.length, required.length); index += 1) {
+    const currentPart = current[index] || 0;
+    const requiredPart = required[index] || 0;
+
+    if (currentPart !== requiredPart) {
+      return currentPart > requiredPart;
+    }
+  }
+
+  return true;
+}
+
+function assertLockedVersionsAtLeast(packageName, minimumByMajor) {
+  const packagePaths = lockedPackagePaths(packageName);
+  assert.ok(packagePaths.length > 0, `${packageName} must be present in the lockfile`);
+
+  for (const packagePath of packagePaths) {
+    const version = lockfile.packages[packagePath].version;
+    const major = version.split('.')[0];
+    const minimum = minimumByMajor[major];
+
+    assert.ok(
+      minimum && versionAtLeast(version, minimum),
+      `${packageName}@${version} must be at least the patched ${minimum || 'supported major'}`
+    );
+  }
+}
+
 test('the vulnerable native image parser toolchain is absent', () => {
   for (const packageName of ['image-size', 'metro', 'react-native']) {
     assert.deepEqual(
@@ -87,5 +119,29 @@ test('Next.js stays on the secured 15.5 backport line', () => {
     manifest.dependencies.next,
     manifest.dependencies['eslint-config-next'],
     'Next.js and eslint-config-next must stay on the same release'
+  );
+});
+
+test('build tooling stays above the patched dependency floors', () => {
+  const patchedFloors = {
+    'brace-expansion': { 1: '1.1.18', 2: '2.1.4', 5: '5.0.9' },
+    minimatch: { 3: '3.1.4', 9: '9.0.7', 10: '10.2.6' },
+    'js-yaml': { 4: '4.3.1' },
+    postcss: { 8: '8.5.23' },
+    nanoid: { 3: '3.3.17' },
+    flatted: { 3: '3.4.2' },
+    picomatch: { 2: '2.3.2', 4: '4.0.5' },
+    yaml: { 2: '2.8.3' },
+    ajv: { 6: '6.14.0', 8: '8.17.1' },
+  };
+
+  for (const [packageName, minimumByMajor] of Object.entries(patchedFloors)) {
+    assertLockedVersionsAtLeast(packageName, minimumByMajor);
+  }
+
+  const tailwindGlob = lockfile.packages['node_modules/sucrase/node_modules/glob'];
+  assert.ok(
+    tailwindGlob && versionAtLeast(tailwindGlob.version, '10.5.0'),
+    'Tailwind\'s glob CLI dependency must include its command-injection fix'
   );
 });
