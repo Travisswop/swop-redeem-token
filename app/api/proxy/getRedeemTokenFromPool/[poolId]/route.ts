@@ -4,10 +4,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { poolId: string } }
+  { params }: { params: Promise<{ poolId: string }> }
 ) {
   try {
-    const { poolId } = params;
+    const { poolId } = await params;
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     if (!apiBaseUrl) {

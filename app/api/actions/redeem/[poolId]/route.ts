@@ -14,11 +14,12 @@ export function OPTIONS() {
 
 export async function GET(
   request: Request,
-  { params }: { params: { poolId: string } },
+  { params }: { params: Promise<{ poolId: string }> },
 ) {
   try {
-    const data = await fetchPool(params.poolId);
-    return actionJson(buildActionResponse(params.poolId, data, getBaseUrl(request)));
+    const { poolId } = await params;
+    const data = await fetchPool(poolId);
+    return actionJson(buildActionResponse(poolId, data, getBaseUrl(request)));
   } catch (error) {
     const status =
       typeof error === 'object' &&

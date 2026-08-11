@@ -73,3 +73,19 @@ test('unused legacy wallet adapters stay out of the web app', () => {
     );
   }
 });
+
+test('Next.js stays on the secured 15.5 backport line', () => {
+  const nextPackage = lockfile.packages?.['node_modules/next'];
+
+  assert.ok(nextPackage?.version, 'Next.js must be present in the lockfile');
+  assert.match(
+    nextPackage.version,
+    /^15\.5\.(?:2[1-9]|[3-9]\d|\d{3,})$/,
+    'Next.js must include the security fixes released in 15.5.21'
+  );
+  assert.equal(
+    manifest.dependencies.next,
+    manifest.dependencies['eslint-config-next'],
+    'Next.js and eslint-config-next must stay on the same release'
+  );
+});

@@ -22,9 +22,10 @@ export function OPTIONS() {
 
 export async function POST(
   request: Request,
-  { params }: { params: { poolId: string } },
+  { params }: { params: Promise<{ poolId: string }> },
 ) {
   try {
+    const { poolId } = await params;
     const body = await request.json().catch(() => ({}));
     const account = String(body?.account || '').trim();
 
@@ -38,7 +39,7 @@ export async function POST(
       return actionJson({ message: 'The connected wallet is not a Solana address.' }, 400);
     }
 
-    const poolData = await fetchPool(params.poolId);
+    const poolData = await fetchPool(poolId);
     const { pool, redeemed } = poolData;
 
     if (!pool) {
@@ -73,7 +74,7 @@ export async function POST(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userWallet: account,
-          poolId: params.poolId,
+          poolId,
         }),
         cache: 'no-store',
       },
