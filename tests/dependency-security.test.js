@@ -53,3 +53,23 @@ test('the supported Solana web wallet path remains installed', () => {
 
   assert.ok(manifest.dependencies['@solana/wallet-adapter-react-ui']);
 });
+
+test('unused legacy wallet adapters stay out of the web app', () => {
+  assert.equal(
+    manifest.dependencies['@solana/wallet-adapter-wallets'],
+    undefined,
+    'the all-wallet bundle must not be reintroduced'
+  );
+
+  for (const packageName of [
+    '@solana/wallet-adapter-torus',
+    '@solana/wallet-adapter-trezor',
+    '@solana/wallet-adapter-walletconnect',
+  ]) {
+    assert.deepEqual(
+      lockedPackagePaths(packageName),
+      [],
+      `${packageName} must not be present in the web app lockfile`
+    );
+  }
+});
