@@ -136,6 +136,16 @@ test('Next.js stays on the secured 15.5 backport line', () => {
   );
 });
 
+test('the image optimizer uses a patched sharp runtime', () => {
+  const sharpPackage = lockfile.packages?.['node_modules/sharp'];
+
+  assert.ok(sharpPackage?.version, 'sharp must be present in the lockfile');
+  assert.ok(
+    versionAtLeast(sharpPackage.version, '0.35.0'),
+    'sharp must include the libvips security fixes released in 0.35.0'
+  );
+});
+
 test('build tooling stays above the patched dependency floors', () => {
   const patchedFloors = {
     'brace-expansion': { 1: '1.1.18', 2: '2.1.4', 5: '5.0.9' },
