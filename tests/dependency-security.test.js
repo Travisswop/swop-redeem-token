@@ -57,6 +57,20 @@ function assertLockedVersionsAtLeast(packageName, minimumByMajor) {
   }
 }
 
+function readRuntimeSources(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      return readRuntimeSources(entryPath);
+    }
+
+    return /\.(?:js|jsx|ts|tsx)$/.test(entry.name)
+      ? [fs.readFileSync(entryPath, 'utf8')]
+      : [];
+  });
+}
+
 test('the vulnerable native image parser toolchain is absent', () => {
   for (const packageName of ['image-size', 'metro', 'react-native']) {
     assert.deepEqual(
@@ -143,5 +157,55 @@ test('build tooling stays above the patched dependency floors', () => {
   assert.ok(
     tailwindGlob && versionAtLeast(tailwindGlob.version, '10.5.0'),
     'Tailwind\'s glob CLI dependency must include its command-injection fix'
+  );
+});
+
+test('Solana runtime dependencies stay above their patched floors', () => {
+  const patchedFloors = {
+    '@babel/runtime': { 7: '7.26.10' },
+    'base-x': { 3: '3.0.11', 4: '4.0.1', 5: '5.0.1', 6: '6.0.0' },
+    'bn.js': { 5: '5.2.3' },
+    uuid: { 11: '11.1.1' },
+    ws: { 7: '7.5.11', 8: '8.21.0' },
+  };
+
+  assert.ok(
+    versionAtLeast(lockfile.packages['node_modules/@solana/web3.js'].version, '1.98.4'),
+    '@solana/web3.js must remain on its patched 1.x release'
+  );
+  assert.deepEqual(
+    lockedPackagePaths('bigint-buffer'),
+    [],
+    'the unpatched native bigint converter must remain absent'
+  );
+
+  for (const [packageName, minimumByMajor] of Object.entries(patchedFloors)) {
+    assertLockedVersionsAtLeast(packageName, minimumByMajor);
+  }
+});
+
+test('the supported Solana address boundary remains compatible', () => {
+  const { Connection, PublicKey, clusterApiUrl } = require('@solana/web3.js');
+  const systemAddress = '11111111111111111111111111111111';
+  const connection = new Connection(clusterApiUrl('mainnet-beta'));
+
+  assert.equal(new PublicKey(systemAddress).toBase58(), systemAddress);
+  assert.throws(() => new PublicKey('not-a-solana-address'));
+  assert.equal(connection.rpcEndpoint, 'https://api.mainnet-beta.solana.com/');
+});
+
+test('server code does not expose bigint-buffer conversion functions', () => {
+  const sources = ['app', 'components', 'lib'].flatMap((directory) =>
+    readRuntimeSources(path.join(repositoryRoot, directory))
+  );
+  const web3Imports = sources.flatMap((source) =>
+    [...source.matchAll(/import\s*{([^}]+)}\s*from\s*['"]@solana\/web3\.js['"]/g)]
+      .flatMap((match) => match[1].split(',').map((name) => name.trim()))
+  );
+
+  assert.deepEqual(
+    [...new Set(web3Imports)].sort(),
+    ['PublicKey', 'clusterApiUrl'],
+    'runtime code may only use the audited PublicKey and endpoint helpers'
   );
 });
