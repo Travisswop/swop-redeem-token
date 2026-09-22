@@ -55,3 +55,14 @@ pnpm dev
 ```
 
 Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples) ([Documentation](https://nextjs.org/docs/deployment)).
+
+## Where this fits
+
+A small standalone redemption app, separate from the main clients. It reaches the
+platform through `swop-app-backend` like everything else.
+
+For the cross-repo map, see **[swop-app-backend/docs/ECOSYSTEM.md](https://github.com/Travisswop/swop-app-backend/blob/main/docs/ECOSYSTEM.md)**.
+
+## Deployment
+
+A push to `main` deploys via Vercel.
