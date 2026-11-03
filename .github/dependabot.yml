@@ -1,0 +1,19 @@
+# Dependabot: keep security updates on, but deliver them as ONE grouped PR per
+# run instead of one PR per package. Version-bump PRs stay off
+# (open-pull-requests-limit: 0), which is the same behaviour as before this file
+# existed — only security updates run.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 0
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
